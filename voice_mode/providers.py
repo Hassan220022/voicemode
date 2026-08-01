@@ -9,10 +9,11 @@ import logging
 from typing import Dict, Optional, List, Any, Tuple
 from openai import AsyncOpenAI
 
+from . import config as vm_config
 from .config import (
     TTS_VOICES, TTS_MODELS, TTS_BASE_URLS, STT_BASE_URLS, STT_MODEL, STT_MODELS,
     TTS_MODELS_BY_PROVIDER, TTS_MODEL_PROVIDER_DEFAULTS, TTS_MODEL_DEFAULT,
-    OPENAI_API_KEY, OMNIROUTE_ONLY, get_voice_preferences,
+    OPENAI_API_KEY, get_voice_preferences,
 )
 from .provider_discovery import provider_registry, EndpointInfo, is_local_provider
 
@@ -60,7 +61,7 @@ async def get_tts_client_and_voice(
         selected_model = model or _select_model_for_endpoint(endpoint_info)
 
         # Disable retries for local endpoints - they either work or don't
-        max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
+        max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
         client = AsyncOpenAI(
             api_key=OPENAI_API_KEY or "dummy-key-for-local",
             base_url=base_url,
@@ -99,7 +100,7 @@ async def get_tts_client_and_voice(
 
                 api_key = OPENAI_API_KEY if endpoint_info.provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
                 # Disable retries for local endpoints - they either work or don't
-                max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(url)) else 2
+                max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(url)) else 2
                 client = AsyncOpenAI(api_key=api_key, base_url=url, max_retries=max_retries)
 
                 logger.info(f"  ✓ Selected endpoint: {url} ({endpoint_info.provider_type})")
@@ -126,7 +127,7 @@ async def get_tts_client_and_voice(
 
                 api_key = OPENAI_API_KEY if endpoint_info.provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
                 # Disable retries for local endpoints - they either work or don't
-                max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(url)) else 2
+                max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(url)) else 2
                 client = AsyncOpenAI(api_key=api_key, base_url=url, max_retries=max_retries)
 
                 logger.info(f"  ✓ Selected endpoint: {url} ({endpoint_info.provider_type})")
@@ -148,7 +149,7 @@ async def get_tts_client_and_voice(
 
             api_key = OPENAI_API_KEY if endpoint_info.provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
             # Disable retries for local endpoints - they either work or don't
-            max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(url)) else 2
+            max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(url)) else 2
             client = AsyncOpenAI(api_key=api_key, base_url=url, max_retries=max_retries)
 
             logger.info(f"  ✓ Selected endpoint: {url} ({endpoint_info.provider_type})")
@@ -190,7 +191,7 @@ async def get_stt_client(
         selected_model = _select_stt_model_for_endpoint(endpoint_info, model)
 
         # Disable retries for local endpoints - they either work or don't
-        max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
+        max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
         client = AsyncOpenAI(
             api_key=OPENAI_API_KEY or "dummy-key-for-local",
             base_url=base_url,
@@ -209,7 +210,7 @@ async def get_stt_client(
     
     api_key = OPENAI_API_KEY if endpoint_info.provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
     # Disable retries for local endpoints - they either work or don't
-    max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(endpoint_info.base_url)) else 2
+    max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(endpoint_info.base_url)) else 2
     client = AsyncOpenAI(
         api_key=api_key,
         base_url=endpoint_info.base_url,

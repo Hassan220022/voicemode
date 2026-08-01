@@ -12,11 +12,12 @@ import httpx
 import sounddevice as sd
 
 # Import all configuration from config.py
+from . import config as vm_config
 from .config import (
     DEBUG, DEBUG_DIR, SAVE_AUDIO, AUDIO_DIR,
     AUDIO_FEEDBACK_ENABLED,
     OPENAI_API_KEY,
-    AUTO_START_KOKORO, PREFER_LOCAL, OMNIROUTE_ONLY,
+    PREFER_LOCAL,
     SAMPLE_RATE, CHANNELS,
     audio_operation_lock, service_processes,
     logger, disable_sounddevice_stderr_redirect
@@ -41,7 +42,7 @@ async def startup_initialization():
     logger.info("Running startup initialization...")
     
     # OmniRoute-only never auto-starts local Kokoro/Whisper.
-    if AUTO_START_KOKORO and not OMNIROUTE_ONLY:
+    if vm_config.AUTO_START_KOKORO and not vm_config.OMNIROUTE_ONLY:
         try:
             # Check if Kokoro is already running
             async with httpx.AsyncClient(timeout=3.0) as client:

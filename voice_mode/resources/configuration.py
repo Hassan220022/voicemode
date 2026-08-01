@@ -5,12 +5,12 @@ from typing import Dict, Any
 from pathlib import Path
 
 from ..server import mcp
+from .. import config as vm_config
 from ..config import (
     logger,
     # Core settings
     BASE_DIR, DEBUG, SAVE_ALL, SAVE_AUDIO, SAVE_TRANSCRIPTIONS,
     AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO,
-    OMNIROUTE_ONLY, AUTO_START_SERVICES,
     # Service settings
     OPENAI_API_KEY, TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
     STT_MODEL, STT_MODELS,
@@ -77,11 +77,11 @@ async def all_configuration() -> str:
     
     # Provider Settings
     lines.append("Provider Settings:")
-    lines.append(f"  OmniRoute Only: {OMNIROUTE_ONLY}")
-    lines.append(f"  Prefer Local: {PREFER_LOCAL}")
-    lines.append(f"  Always Try Local: {ALWAYS_TRY_LOCAL}")
-    lines.append(f"  Auto-start Kokoro: {AUTO_START_KOKORO}")
-    lines.append(f"  Auto-start Services: {AUTO_START_SERVICES}")
+    lines.append(f"  OmniRoute Only: {vm_config.OMNIROUTE_ONLY}")
+    lines.append(f"  Prefer Local: {vm_config.PREFER_LOCAL}")
+    lines.append(f"  Always Try Local: {vm_config.ALWAYS_TRY_LOCAL}")
+    lines.append(f"  Auto-start Kokoro: {vm_config.AUTO_START_KOKORO}")
+    lines.append(f"  Auto-start Services: {vm_config.AUTO_START_SERVICES}")
     lines.append(f"  TTS Endpoints: {', '.join(TTS_BASE_URLS)}")
     lines.append(f"  STT Endpoints: {', '.join(STT_BASE_URLS)}")
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")

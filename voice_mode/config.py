@@ -626,7 +626,8 @@ def _endpoint_hostname(url: str) -> str:
     from urllib.parse import urlparse
 
     try:
-        return (urlparse(url.strip()).hostname or "").lower()
+        host = (urlparse(url.strip()).hostname or "").lower()
+        return host.rstrip(".")
     except Exception:
         return ""
 

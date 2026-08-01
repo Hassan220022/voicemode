@@ -104,6 +104,16 @@ def test_rejects_api_openai_com(isolated_reload, monkeypatch, tts, stt):
     assert "api.openai.com" in str(exc.value)
 
 
+def test_rejects_api_openai_com_trailing_dot(isolated_reload, monkeypatch):
+    cfg = isolated_reload
+    monkeypatch.setenv("VOICEMODE_OMNIROUTE_ONLY", "true")
+    monkeypatch.setenv("VOICEMODE_TTS_BASE_URLS", "https://api.openai.com./v1")
+    monkeypatch.setenv("VOICEMODE_STT_BASE_URLS", OMNI_URL)
+    with pytest.raises(cfg.OmniRouteConfigError) as exc:
+        cfg.reload_configuration()
+    assert "api.openai.com" in str(exc.value)
+
+
 @pytest.mark.parametrize(
     "tts,stt",
     [
@@ -152,9 +162,9 @@ def test_validate_helper_skips_when_disabled():
 def test_api_key_masked_in_config_display():
     from voice_mode.resources.configuration import mask_sensitive
 
-    secret = "sk-omniroute-super-secret-key-value"
-    masked = mask_sensitive(secret, "openai_api_key")
-    assert secret not in masked
+    sample_key = "sk-omniroute-super-secret-key-value"
+    masked = mask_sensitive(sample_key, "openai_api_key")
+    assert sample_key not in masked
     assert "super-secret" not in masked
     assert masked.startswith("sk-omnir")
     assert masked.endswith("alue")
@@ -179,8 +189,8 @@ async def test_shared_startup_skips_kokoro_when_omniroute_only():
     import voice_mode.shared as shared
 
     with (
-        patch.object(shared, "AUTO_START_KOKORO", True),
-        patch.object(shared, "OMNIROUTE_ONLY", True),
+        patch("voice_mode.config.AUTO_START_KOKORO", True),
+        patch("voice_mode.config.OMNIROUTE_ONLY", True),
         patch.object(shared, "_startup_initialized", False),
         patch("voice_mode.shared.subprocess.Popen") as popen,
     ):
@@ -198,12 +208,32 @@ def test_clone_voice_does_not_bypass_omniroute_urls():
     )()
 
     with (
-        patch("voice_mode.simple_failover.OMNIROUTE_ONLY", True),
+        patch("voice_mode.config.OMNIROUTE_ONLY", True),
         patch("voice_mode.voice_profiles.is_clone_voice", return_value=True),
         patch("voice_mode.voice_profiles.get_profile", return_value=fake_profile),
-        patch("voice_mode.simple_failover.TTS_BASE_URLS", [OMNI_URL]),
+        patch("voice_mode.config.TTS_BASE_URLS", [OMNI_URL]),
     ):
         endpoints, profile = _resolve_tts_endpoints("my_clone", None)
 
     assert endpoints == [OMNI_URL]
     assert profile is fake_profile
+
+
+def test_reload_updates_live_omniroute_flag(isolated_reload, monkeypatch):
+    """Consumers that read vm_config.OMNIROUTE_ONLY see reload_configuration()."""
+    import voice_mode.config as cfg
+    import voice_mode.simple_failover as sf
+
+    monkeypatch.setenv("VOICEMODE_OMNIROUTE_ONLY", "true")
+    monkeypatch.setenv("VOICEMODE_TTS_BASE_URLS", OMNI_URL)
+    monkeypatch.setenv("VOICEMODE_STT_BASE_URLS", OMNI_URL)
+    cfg.reload_configuration()
+    assert cfg.OMNIROUTE_ONLY is True
+    assert sf.vm_config.OMNIROUTE_ONLY is True
+
+    monkeypatch.setenv("VOICEMODE_OMNIROUTE_ONLY", "false")
+    monkeypatch.delenv("VOICEMODE_TTS_BASE_URLS", raising=False)
+    monkeypatch.delenv("VOICEMODE_STT_BASE_URLS", raising=False)
+    cfg.reload_configuration()
+    assert cfg.OMNIROUTE_ONLY is False
+    assert sf.vm_config.OMNIROUTE_ONLY is False
