@@ -15,6 +15,7 @@ from .provider_discovery import is_local_provider
 from .config import (
     TTS_BASE_URLS, STT_BASE_URLS, OPENAI_API_KEY, STT_PROMPT, WHISPER_LANGUAGE,
     STT_RETRY_ATTEMPTS, STT_RETRY_BACKOFF, STT_RETRY_BACKOFF_MAX,
+    OMNIROUTE_ONLY,
 )
 from .provider_discovery import detect_provider_type, EndpointInfo
 from .providers import _select_stt_model_for_endpoint, _select_tts_model_for_endpoint
@@ -42,6 +43,13 @@ def _resolve_tts_endpoints(voice, ref_text_override):
         if ref_text_override is not None:
             clone_profile = _dc_replace(clone_profile, ref_text=ref_text_override)
             logger.info(f"Voice '{voice}': applying ref_text override ({len(ref_text_override)} chars)")
+        if OMNIROUTE_ONLY:
+            # Strict mode never leaves the pinned TTS URL for a clone endpoint.
+            logger.warning(
+                f"Voice '{voice}' is a clone profile but VOICEMODE_OMNIROUTE_ONLY=true; "
+                f"keeping TTS on configured endpoint(s) instead of {clone_profile.base_url}"
+            )
+            return TTS_BASE_URLS, clone_profile
         logger.info(f"Voice '{voice}' is a clone profile, routing to {clone_profile.base_url}")
         return [clone_profile.base_url], clone_profile
 
@@ -100,8 +108,12 @@ def _prepare_tts_endpoint(base_url, voice, model, clone_profile):
             selected_voice = voice  # Use original voice for Kokoro
     logger.info(f"Endpoint {base_url} ({provider_type}): model={selected_model}")
 
-    # Disable retries for local endpoints - they either work or don't
-    max_retries = 0 if is_local_provider(base_url) else 2
+    # Disable retries for local endpoints - they either work or don't.
+    # OmniRoute-only: no SDK multi-retry either — fail the single endpoint explicitly.
+    if OMNIROUTE_ONLY or is_local_provider(base_url):
+        max_retries = 0
+    else:
+        max_retries = 2
     client = AsyncOpenAI(
         api_key=api_key,
         base_url=base_url,
@@ -415,8 +427,8 @@ async def simple_stt_failover(
             # retries for local STT are handled by the explicit backoff loop
             # around the transcription call below (VM-926) so we can classify
             # transient vs permanent and log each attempt. Remote endpoints keep
-            # 2 SDK-level retries.
-            max_retries = 0 if is_local_provider(base_url) else 2
+            # 2 SDK-level retries. OmniRoute-only never multi-retries.
+            max_retries = 0 if (OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
             client = AsyncOpenAI(
                 api_key=api_key,
                 base_url=base_url,
@@ -464,7 +476,10 @@ async def simple_stt_failover(
             # for local (the client above uses max_retries=0, so no double-retry).
             # Remote endpoints get retries=0 here and keep their SDK max_retries=2,
             # so remote behaviour is unchanged.
-            retries = STT_RETRY_ATTEMPTS if is_local_provider(base_url) else 0
+            retries = (
+                0 if OMNIROUTE_ONLY
+                else (STT_RETRY_ATTEMPTS if is_local_provider(base_url) else 0)
+            )
             attempt = 0
             while True:
                 try:

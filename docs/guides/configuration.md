@@ -2,19 +2,21 @@
 
 VoiceMode provides flexible configuration through environment variables and configuration files, following standard precedence rules while maintaining sensible defaults.
 
-*Note: The Python package is called `voice-mode` but the preferred command is `voicemode`.*
+_Note: The Python package is called `voice-mode` but the preferred command is `voicemode`._
 
 ## Quick Start
 
 VoiceMode works out of the box with minimal configuration:
 
 ### With Cloud Voice Services
+
 ```bash
-# Just need an OpenAI API key
+# OpenAI-compatible API key (OpenAI cloud, or an OmniRoute/proxy key)
 export OPENAI_API_KEY="your-api-key"
 ```
 
 ### With Local Voice Services
+
 ```bash
 # Install local services
 voicemode service install kokoro
@@ -27,12 +29,18 @@ voicemode service enable whisper
 # VoiceMode auto-detects them!
 ```
 
-### Hybrid Setup (Recommended)
+### Hybrid Setup (Recommended for most users)
+
 ```bash
 # Use local services with cloud fallback
-export OPENAI_API_KEY="your-api-key"  # Fallback
+export OPENAI_API_KEY="your-api-key"  # Fallback (OpenAI cloud or compatible)
 # Local services auto-detected when running
 ```
+
+### OmniRoute-only (no OpenAI / no local fallback)
+
+See [OmniRoute-only backend](#omniroute-only-backend-strict) below. Use when TTS
+and STT must go only through your self-hosted OpenAI-compatible proxy.
 
 ## Configuration System
 
@@ -81,8 +89,9 @@ When used as an MCP server, add to your Claude or other MCP client configuration
 ### API Keys and Authentication
 
 ```bash
-# OpenAI API Key (for cloud TTS/STT)
-OPENAI_API_KEY=sk-...
+# OpenAI-compatible Bearer token (OpenAI cloud TTS/STT, or OmniRoute / other proxy).
+# Variable name stays OPENAI_API_KEY for AsyncOpenAI client compatibility.
+OPENAI_API_KEY=sk-...   # or YOUR_OMNIROUTE_API_KEY
 
 # LiveKit credentials (for room-based voice)
 LIVEKIT_API_KEY=devkey          # Default for local dev
@@ -205,12 +214,12 @@ VOICEMODE_CONCH_MCP_WAIT_CAP=25      # Hard cap (s) on a blocking MCP conch wait
 When `converse` finds the conch busy, what happens next is controlled by two
 independent knobs:
 
-- **`wait_for_conch`** is the *gate*. Left at its default (`false`), a busy
+- **`wait_for_conch`** is the _gate_. Left at its default (`false`), a busy
   `converse` returns **immediately** with a status that names the holder and
-  notes you are *not* queued — it never silently blocks a caller who didn't opt
+  notes you are _not_ queued — it never silently blocks a caller who didn't opt
   in. Set it `true` (or to a number of seconds) to join the queue.
 - **`conch_mode`** (default `VOICEMODE_CONCH_MODE`) chooses how you're served
-  *once queued*: `wait` blocks until your turn; `callback` registers you and
+  _once queued_: `wait` blocks until your turn; `callback` registers you and
   returns straight away with your queue position (your turn is delivered later —
   out-of-band push is tracked in VM-1625).
 
@@ -219,7 +228,7 @@ Two properties the queue buys you over the old blind poll-and-block:
 - **Visibility** — a waiting `converse` shows up in `voicemode conch status`
   as a queued waiter (with its mode and position), instead of polling silently
   where no one can see it.
-- **Fairness** — the floor is handed out in FIFO order via a *grant hint*: when
+- **Fairness** — the floor is handed out in FIFO order via a _grant hint_: when
   the holder releases, only the next-in-line is allowed to acquire, so several
   waiters can't thunder in and race for it. WAIT honours the grant; it does not
   steal ahead of the head.
@@ -237,7 +246,7 @@ Agents on a **streamable-HTTP** voicemode server have no access to the host's
 `~/.voicemode/` conch files, so they reach the same queue through the MCP
 `conch` tool — the second of two equal front ends alongside the CLI (both share
 one implementation in `voice_mode/conch_ops.py`, so `give`/`bump`/`release`
-issued over MCP mutate the *same* state the CLI does). One composite tool with
+issued over MCP mutate the _same_ state the CLI does). One composite tool with
 an `action` arg mirrors the CLI verbs:
 
 - `conch(action="status")` — holder + ordered queue (no session needed).
@@ -260,7 +269,7 @@ A remote agent has no host PID, so its liveness is the `expires` heartbeat TTL
 `wait`/`callback`/`heartbeat` call; a waiter past its TTL is auto-pruned so a
 dead remote agent never wedges the queue. **`session_id` is required** for the
 register/heartbeat/leave actions — it is the remote agent's stable queue and
-grant key (there is no `CLAUDE_CODE_SESSION_ID` env over HTTP). Remote *push*
+grant key (there is no `CLAUDE_CODE_SESSION_ID` env over HTTP). Remote _push_
 notify-on-give lands with VM-970; until then the grant is discovered on the
 agent's next `status`/`heartbeat`/`callback` call (the pull-only path).
 
@@ -307,6 +316,7 @@ VOICEMODE_SERVE_LOG_LEVEL=info      # Log level: debug, info, warning, error
 ```
 
 **Quick Start:**
+
 ```bash
 # Start VoiceMode HTTP server
 voicemode service start voicemode
@@ -394,6 +404,7 @@ VoiceMode balances MCP compliance with user convenience:
 ## Common Configurations
 
 ### Privacy-Focused Local Setup
+
 ```bash
 # No cloud services, everything local
 export VOICEMODE_TTS_BASE_URLS=http://127.0.0.1:8880/v1
@@ -402,6 +413,7 @@ export VOICEMODE_VOICES=af_sky
 ```
 
 ### High-Quality Cloud Setup
+
 ```bash
 # Best quality with OpenAI
 export OPENAI_API_KEY=sk-...
@@ -409,9 +421,61 @@ export VOICEMODE_TTS_MODEL=tts-1-hd
 export VOICEMODE_VOICES=nova,alloy
 ```
 
+### OmniRoute-only backend (strict)
+
+Opt-in mode that pins **both** TTS and STT to a single OpenAI-compatible
+endpoint (for example a self-hosted OmniRoute proxy). No OpenAI cloud fallback,
+no local Whisper/Kokoro auto-start, no comma-separated failover chains.
+
+Requirements:
+
+- OmniRoute (or equivalent) must implement OpenAI-compatible
+  `/v1/audio/speech` and `/v1/audio/transcriptions`.
+- `VOICEMODE_TTS_BASE_URLS` and `VOICEMODE_STT_BASE_URLS` each contain **exactly
+  one** URL. Do not include `api.openai.com`. Do not use multiple
+  comma-separated URLs.
+- `OPENAI_API_KEY` holds the OmniRoute Bearer credential (variable name kept for
+  OpenAI client compatibility). Set it in the host environment or untracked
+  `~/.voicemode/voicemode.env` — never commit it to `.mcp.json` or git.
+- A failed OmniRoute request returns an explicit error; VoiceMode does not retry
+  through OpenAI or local services in this mode.
+
+```bash
+export OPENAI_API_KEY=YOUR_OMNIROUTE_API_KEY
+export VOICEMODE_OMNIROUTE_ONLY=true
+export VOICEMODE_TTS_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
+export VOICEMODE_STT_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
+export VOICEMODE_TTS_MODEL=tts-1
+export VOICEMODE_STT_MODEL=whisper-1
+export VOICEMODE_TTS_VOICE=alloy
+export VOICEMODE_PREFER_LOCAL=false
+export VOICEMODE_AUTO_START_SERVICES=false
+```
+
+Or copy the tracked template:
+
+```bash
+cp .voicemode.env.example ~/.voicemode/voicemode.env
+# edit placeholders, then restart the MCP server / client
+```
+
+Validate without leaking the key:
+
+```bash
+voicemode config get VOICEMODE_OMNIROUTE_ONLY
+voicemode config get VOICEMODE_TTS_BASE_URLS
+voicemode config get VOICEMODE_STT_BASE_URLS
+# API key display is masked (prefix…suffix) when shown via config resources
+```
+
+Invalid OmniRoute-only config fails closed at startup/reload with an actionable
+error (missing URL, multi-URL chain, or `api.openai.com`). Defaults and
+failover behavior are unchanged when `VOICEMODE_OMNIROUTE_ONLY` is unset/false.
+
 ## Troubleshooting Configuration
 
 ### Check Active Configuration
+
 ```bash
 # List all configuration keys
 voicemode config list
@@ -430,6 +494,7 @@ voicemode config get OPENAI_API_KEY
 5. **Enable debug**: Set `VOICEMODE_DEBUG=true` for details
 
 ### Reset Configuration
+
 ```bash
 # Backup and recreate default config
 mv ~/.voicemode/voicemode.env ~/.voicemode/voicemode.env.backup
@@ -448,9 +513,7 @@ Add to `.claude/settings.local.json` in your project:
 ```json
 {
   "permissions": {
-    "allow": [
-      "mcp__voicemode__converse"
-    ]
+    "allow": ["mcp__voicemode__converse"]
   }
 }
 ```
@@ -460,20 +523,17 @@ To also allow service management (start/stop/status):
 ```json
 {
   "permissions": {
-    "allow": [
-      "mcp__voicemode__converse",
-      "mcp__voicemode__service"
-    ]
+    "allow": ["mcp__voicemode__converse", "mcp__voicemode__service"]
   }
 }
 ```
 
 ### Settings File Locations
 
-| File | Scope | Git |
-|------|-------|-----|
-| `~/.claude/settings.json` | All projects | N/A |
-| `.claude/settings.json` | Project (shared) | Commit |
+| File                          | Scope              | Git    |
+| ----------------------------- | ------------------ | ------ |
+| `~/.claude/settings.json`     | All projects       | N/A    |
+| `.claude/settings.json`       | Project (shared)   | Commit |
 | `.claude/settings.local.json` | Project (personal) | Ignore |
 
 ### Allowing All VoiceMode Tools
@@ -569,9 +629,9 @@ log show --predicate 'process == "voicemode"' --last 1h
 
 #### Security Mode Summary
 
-| Access Level | Host | Security |
-|--------------|------|----------|
-| Localhost only | `127.0.0.1` | No auth needed |
-| Local network | `0.0.0.0` + ALLOWED_IPS | Token recommended |
-| Tailscale | `0.0.0.0` + ALLOW_TAILSCALE | Token recommended |
-| Internet | Use secure tunnel | Token required |
+| Access Level   | Host                        | Security          |
+| -------------- | --------------------------- | ----------------- |
+| Localhost only | `127.0.0.1`                 | No auth needed    |
+| Local network  | `0.0.0.0` + ALLOWED_IPS     | Token recommended |
+| Tailscale      | `0.0.0.0` + ALLOW_TAILSCALE | Token recommended |
+| Internet       | Use secure tunnel           | Token required    |

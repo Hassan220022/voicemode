@@ -10,6 +10,7 @@ from ..config import (
     # Core settings
     BASE_DIR, DEBUG, SAVE_ALL, SAVE_AUDIO, SAVE_TRANSCRIPTIONS,
     AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO,
+    OMNIROUTE_ONLY, AUTO_START_SERVICES,
     # Service settings
     OPENAI_API_KEY, TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
     STT_MODEL, STT_MODELS,
@@ -76,15 +77,20 @@ async def all_configuration() -> str:
     
     # Provider Settings
     lines.append("Provider Settings:")
+    lines.append(f"  OmniRoute Only: {OMNIROUTE_ONLY}")
     lines.append(f"  Prefer Local: {PREFER_LOCAL}")
     lines.append(f"  Always Try Local: {ALWAYS_TRY_LOCAL}")
     lines.append(f"  Auto-start Kokoro: {AUTO_START_KOKORO}")
+    lines.append(f"  Auto-start Services: {AUTO_START_SERVICES}")
     lines.append(f"  TTS Endpoints: {', '.join(TTS_BASE_URLS)}")
     lines.append(f"  STT Endpoints: {', '.join(STT_BASE_URLS)}")
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")
     lines.append(f"  TTS Models: {', '.join(TTS_MODELS)}")
     if OPENAI_API_KEY:
-        lines.append(f"  OpenAI API Key: {mask_sensitive(OPENAI_API_KEY, 'openai_api_key')}")
+        # OPENAI_API_KEY may hold an OmniRoute (or other OpenAI-compatible) credential.
+        lines.append(
+            f"  OpenAI-compatible API Key: {mask_sensitive(OPENAI_API_KEY, 'openai_api_key')}"
+        )
     lines.append("")
     
     # Audio Settings

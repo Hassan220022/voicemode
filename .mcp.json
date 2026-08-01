@@ -3,12 +3,16 @@
     "voicemode": {
       "type": "stdio",
       "command": "uv",
-      "args": [
-        "run",
-        "voicemode"
-      ],
+      "args": ["run", "voicemode"],
       "env": {
-        "#VOICEMODE_SAVE_ALL": "true"
+        "VOICEMODE_OMNIROUTE_ONLY": "true",
+        "VOICEMODE_TTS_BASE_URLS": "https://YOUR-OMNIROUTE-HOST/v1",
+        "VOICEMODE_STT_BASE_URLS": "https://YOUR-OMNIROUTE-HOST/v1",
+        "VOICEMODE_TTS_MODEL": "tts-1",
+        "VOICEMODE_STT_MODEL": "whisper-1",
+        "VOICEMODE_TTS_VOICE": "alloy",
+        "VOICEMODE_PREFER_LOCAL": "false",
+        "VOICEMODE_AUTO_START_SERVICES": "false"
       }
     }
   }

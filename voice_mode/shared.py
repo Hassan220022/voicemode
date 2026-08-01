@@ -16,7 +16,7 @@ from .config import (
     DEBUG, DEBUG_DIR, SAVE_AUDIO, AUDIO_DIR,
     AUDIO_FEEDBACK_ENABLED,
     OPENAI_API_KEY,
-    AUTO_START_KOKORO, PREFER_LOCAL,
+    AUTO_START_KOKORO, PREFER_LOCAL, OMNIROUTE_ONLY,
     SAMPLE_RATE, CHANNELS,
     audio_operation_lock, service_processes,
     logger, disable_sounddevice_stderr_redirect
@@ -40,8 +40,8 @@ async def startup_initialization():
     _startup_initialized = True
     logger.info("Running startup initialization...")
     
-    # Check if we should auto-start Kokoro
-    if AUTO_START_KOKORO:
+    # OmniRoute-only never auto-starts local Kokoro/Whisper.
+    if AUTO_START_KOKORO and not OMNIROUTE_ONLY:
         try:
             # Check if Kokoro is already running
             async with httpx.AsyncClient(timeout=3.0) as client:
