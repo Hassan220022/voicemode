@@ -211,7 +211,7 @@ def test_clone_voice_does_not_bypass_omniroute_urls():
         patch("voice_mode.config.OMNIROUTE_ONLY", True),
         patch("voice_mode.voice_profiles.is_clone_voice", return_value=True),
         patch("voice_mode.voice_profiles.get_profile", return_value=fake_profile),
-        patch("voice_mode.config.TTS_BASE_URLS", [OMNI_URL]),
+        patch("voice_mode.simple_failover.TTS_BASE_URLS", [OMNI_URL]),
     ):
         endpoints, profile = _resolve_tts_endpoints("my_clone", None)
 
