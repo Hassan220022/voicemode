@@ -11,7 +11,7 @@ VoiceMode works out of the box with minimal configuration:
 ### With Cloud Voice Services
 
 ```bash
-# OpenAI-compatible API key (OpenAI cloud, or an OmniRoute/proxy key)
+# OpenAI-compatible API key (OpenAI cloud, or an 9router/proxy key)
 export OPENAI_API_KEY="your-api-key"
 ```
 
@@ -37,9 +37,9 @@ export OPENAI_API_KEY="your-api-key"  # Fallback (OpenAI cloud or compatible)
 # Local services auto-detected when running
 ```
 
-### OmniRoute-only (no OpenAI / no local fallback)
+### 9router-only (no OpenAI / no local fallback)
 
-See [OmniRoute-only backend](#omniroute-only-backend-strict) below. Use when TTS
+See [9router-only backend](#9router-only-backend-strict) below. Use when TTS
 and STT must go only through your self-hosted OpenAI-compatible proxy.
 
 ## Configuration System
@@ -89,9 +89,9 @@ When used as an MCP server, add to your Claude or other MCP client configuration
 ### API Keys and Authentication
 
 ```bash
-# OpenAI-compatible Bearer token (OpenAI cloud TTS/STT, or OmniRoute / other proxy).
+# OpenAI-compatible Bearer token (OpenAI cloud TTS/STT, or 9router / other proxy).
 # Variable name stays OPENAI_API_KEY for AsyncOpenAI client compatibility.
-OPENAI_API_KEY=sk-...   # or YOUR_OMNIROUTE_API_KEY
+OPENAI_API_KEY=sk-...   # or YOUR_9ROUTER_API_KEY
 
 # LiveKit credentials (for room-based voice)
 LIVEKIT_API_KEY=devkey          # Default for local dev
@@ -421,30 +421,30 @@ export VOICEMODE_TTS_MODEL=tts-1-hd
 export VOICEMODE_VOICES=nova,alloy
 ```
 
-### OmniRoute-only backend (strict)
+### 9router-only backend (strict)
 
 Opt-in mode that pins **both** TTS and STT to a single OpenAI-compatible
-endpoint (for example a self-hosted OmniRoute proxy). No OpenAI cloud fallback,
+endpoint (for example a self-hosted 9router proxy). No OpenAI cloud fallback,
 no local Whisper/Kokoro auto-start, no comma-separated failover chains.
 
 Requirements:
 
-- OmniRoute (or equivalent) must implement OpenAI-compatible
+- 9router (or equivalent) must implement OpenAI-compatible
   `/v1/audio/speech` and `/v1/audio/transcriptions`.
 - `VOICEMODE_TTS_BASE_URLS` and `VOICEMODE_STT_BASE_URLS` each contain **exactly
   one** URL. Do not include `api.openai.com`. Do not use multiple
   comma-separated URLs.
-- `OPENAI_API_KEY` holds the OmniRoute Bearer credential (variable name kept for
+- `OPENAI_API_KEY` holds the 9router Bearer credential (variable name kept for
   OpenAI client compatibility). Set it in the host environment or untracked
   `~/.voicemode/voicemode.env` — never commit it to `.mcp.json` or git.
-- A failed OmniRoute request returns an explicit error; VoiceMode does not retry
+- A failed 9router request returns an explicit error; VoiceMode does not retry
   through OpenAI or local services in this mode.
 
 ```bash
-export OPENAI_API_KEY=YOUR_OMNIROUTE_API_KEY
-export VOICEMODE_OMNIROUTE_ONLY=true
-export VOICEMODE_TTS_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
-export VOICEMODE_STT_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
+export OPENAI_API_KEY=YOUR_9ROUTER_API_KEY
+export VOICEMODE_9ROUTER_ONLY=true
+export VOICEMODE_TTS_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
+export VOICEMODE_STT_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
 export VOICEMODE_TTS_MODEL=tts-1
 export VOICEMODE_STT_MODEL=whisper-1
 export VOICEMODE_TTS_VOICE=alloy
@@ -462,15 +462,15 @@ cp .voicemode.env.example ~/.voicemode/voicemode.env
 Validate without leaking the key:
 
 ```bash
-voicemode config get VOICEMODE_OMNIROUTE_ONLY
+voicemode config get VOICEMODE_9ROUTER_ONLY
 voicemode config get VOICEMODE_TTS_BASE_URLS
 voicemode config get VOICEMODE_STT_BASE_URLS
 # API key display is masked (prefix…suffix) when shown via config resources
 ```
 
-Invalid OmniRoute-only config fails closed at startup/reload with an actionable
+Invalid 9router-only config fails closed at startup/reload with an actionable
 error (missing URL, multi-URL chain, or `api.openai.com`). Defaults and
-failover behavior are unchanged when `VOICEMODE_OMNIROUTE_ONLY` is unset/false.
+failover behavior are unchanged when `VOICEMODE_9ROUTER_ONLY` is unset/false.
 
 ## Troubleshooting Configuration
 

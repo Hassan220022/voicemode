@@ -43,10 +43,10 @@ def _resolve_tts_endpoints(voice, ref_text_override):
         if ref_text_override is not None:
             clone_profile = _dc_replace(clone_profile, ref_text=ref_text_override)
             logger.info(f"Voice '{voice}': applying ref_text override ({len(ref_text_override)} chars)")
-        if vm_config.OMNIROUTE_ONLY:
+        if vm_config.NINE_ROUTER_ONLY:
             # Strict mode never leaves the pinned TTS URL for a clone endpoint.
             logger.warning(
-                f"Voice '{voice}' is a clone profile but VOICEMODE_OMNIROUTE_ONLY=true; "
+                f"Voice '{voice}' is a clone profile but VOICEMODE_9ROUTER_ONLY=true; "
                 f"keeping TTS on configured endpoint(s) instead of {clone_profile.base_url}"
             )
             return TTS_BASE_URLS, clone_profile
@@ -109,8 +109,8 @@ def _prepare_tts_endpoint(base_url, voice, model, clone_profile):
     logger.info(f"Endpoint {base_url} ({provider_type}): model={selected_model}")
 
     # Disable retries for local endpoints - they either work or don't.
-    # OmniRoute-only: no SDK multi-retry either — fail the single endpoint explicitly.
-    if vm_config.OMNIROUTE_ONLY or is_local_provider(base_url):
+    # 9router-only: no SDK multi-retry either — fail the single endpoint explicitly.
+    if vm_config.NINE_ROUTER_ONLY or is_local_provider(base_url):
         max_retries = 0
     else:
         max_retries = 2
@@ -427,8 +427,8 @@ async def simple_stt_failover(
             # retries for local STT are handled by the explicit backoff loop
             # around the transcription call below (VM-926) so we can classify
             # transient vs permanent and log each attempt. Remote endpoints keep
-            # 2 SDK-level retries. OmniRoute-only never multi-retries.
-            max_retries = 0 if (vm_config.OMNIROUTE_ONLY or is_local_provider(base_url)) else 2
+            # 2 SDK-level retries. 9router-only never multi-retries.
+            max_retries = 0 if (vm_config.NINE_ROUTER_ONLY or is_local_provider(base_url)) else 2
             client = AsyncOpenAI(
                 api_key=api_key,
                 base_url=base_url,
@@ -477,7 +477,7 @@ async def simple_stt_failover(
             # Remote endpoints get retries=0 here and keep their SDK max_retries=2,
             # so remote behaviour is unchanged.
             retries = (
-                0 if vm_config.OMNIROUTE_ONLY
+                0 if vm_config.NINE_ROUTER_ONLY
                 else (STT_RETRY_ATTEMPTS if is_local_provider(base_url) else 0)
             )
             attempt = 0

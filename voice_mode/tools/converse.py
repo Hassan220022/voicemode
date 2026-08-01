@@ -438,11 +438,11 @@ async def startup_initialization():
     logger.info("Initializing provider registry...")
     await provider_registry.initialize()
     
-    # Check if we should auto-start Kokoro (never under OmniRoute-only).
+    # Check if we should auto-start Kokoro (never under 9router-only).
     # Read live config module attrs so reload_configuration() is observed.
     import voice_mode.config as _vm_config
     auto_start_kokoro = (
-        not _vm_config.OMNIROUTE_ONLY
+        not _vm_config.NINE_ROUTER_ONLY
         and (
             _vm_config.AUTO_START_KOKORO
             or os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")

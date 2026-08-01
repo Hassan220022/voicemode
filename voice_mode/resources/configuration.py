@@ -77,7 +77,7 @@ async def all_configuration() -> str:
     
     # Provider Settings
     lines.append("Provider Settings:")
-    lines.append(f"  OmniRoute Only: {vm_config.OMNIROUTE_ONLY}")
+    lines.append(f"  9router Only: {vm_config.NINE_ROUTER_ONLY}")
     lines.append(f"  Prefer Local: {vm_config.PREFER_LOCAL}")
     lines.append(f"  Always Try Local: {vm_config.ALWAYS_TRY_LOCAL}")
     lines.append(f"  Auto-start Kokoro: {vm_config.AUTO_START_KOKORO}")
@@ -87,7 +87,7 @@ async def all_configuration() -> str:
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")
     lines.append(f"  TTS Models: {', '.join(TTS_MODELS)}")
     if OPENAI_API_KEY:
-        # OPENAI_API_KEY may hold an OmniRoute (or other OpenAI-compatible) credential.
+        # OPENAI_API_KEY may hold an 9router (or other OpenAI-compatible) credential.
         lines.append(
             f"  OpenAI-compatible API Key: {mask_sensitive(OPENAI_API_KEY, 'openai_api_key')}"
         )

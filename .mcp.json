@@ -10,7 +10,7 @@
         "voicemode"
       ],
       "env": {
-        "VOICEMODE_OMNIROUTE_ONLY": "true",
+        "VOICEMODE_9ROUTER_ONLY": "true",
         "VOICEMODE_TTS_BASE_URLS": "https://9router.mikawi.org/v1",
         "VOICEMODE_STT_BASE_URLS": "https://9router.mikawi.org/v1",
         "VOICEMODE_TTS_MODEL": "edge-tts/en-US-AriaNeural",

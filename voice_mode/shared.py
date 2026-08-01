@@ -41,8 +41,8 @@ async def startup_initialization():
     _startup_initialized = True
     logger.info("Running startup initialization...")
     
-    # OmniRoute-only never auto-starts local Kokoro/Whisper.
-    if vm_config.AUTO_START_KOKORO and not vm_config.OMNIROUTE_ONLY:
+    # 9router-only never auto-starts local Kokoro/Whisper.
+    if vm_config.AUTO_START_KOKORO and not vm_config.NINE_ROUTER_ONLY:
         try:
             # Check if Kokoro is already running
             async with httpx.AsyncClient(timeout=3.0) as client:

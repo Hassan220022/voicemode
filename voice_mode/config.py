@@ -192,12 +192,12 @@ VOICEMODE_VOICES=af_sky
 # Auto-start local services alias (docs name; same effect as AUTO_START_KOKORO today)
 # VOICEMODE_AUTO_START_SERVICES=false
 
-# OmniRoute-only mode (opt-in): pin TTS+STT to exactly one non-OpenAI OpenAI-compatible
+# 9router-only mode (opt-in): pin TTS+STT to exactly one non-OpenAI OpenAI-compatible
 # endpoint each. No api.openai.com, no comma-separated failover, no local auto-start.
-# OPENAI_API_KEY is still the Bearer credential (OmniRoute key or other compatible key).
-# VOICEMODE_OMNIROUTE_ONLY=false
-# VOICEMODE_TTS_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
-# VOICEMODE_STT_BASE_URLS=https://YOUR-OMNIROUTE-HOST/v1
+# OPENAI_API_KEY is still the Bearer credential (9router key or other compatible key).
+# VOICEMODE_9ROUTER_ONLY=false
+# VOICEMODE_TTS_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
+# VOICEMODE_STT_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
 
 #############
 # Whisper Configuration
@@ -611,14 +611,14 @@ AUTO_START_KOKORO = (
     or AUTO_START_SERVICES
 )
 
-# OmniRoute-only: fail closed to a single OpenAI-compatible non-OpenAI backend.
+# 9router-only: fail closed to a single OpenAI-compatible non-OpenAI backend.
 # Must be defined before TTS/STT URL parsing so defaults that include api.openai.com
 # are not injected while this mode is on.
-OMNIROUTE_ONLY = os.getenv("VOICEMODE_OMNIROUTE_ONLY", "").lower() in ("true", "1", "yes", "on")
+NINE_ROUTER_ONLY = os.getenv("VOICEMODE_9ROUTER_ONLY", "").lower() in ("true", "1", "yes", "on")
 
 
-class OmniRouteConfigError(ValueError):
-    """Invalid VOICEMODE_OMNIROUTE_ONLY configuration (fail closed, never rewrite)."""
+class NineRouterConfigError(ValueError):
+    """Invalid VOICEMODE_9ROUTER_ONLY configuration (fail closed, never rewrite)."""
 
 
 def _endpoint_hostname(url: str) -> str:
@@ -632,20 +632,20 @@ def _endpoint_hostname(url: str) -> str:
         return ""
 
 
-def validate_omniroute_only_urls(
+def validate_nine_router_only_urls(
     tts_urls: list,
     stt_urls: list,
     *,
     enabled: bool | None = None,
 ) -> None:
-    """Fail closed when OmniRoute-only mode is enabled with invalid endpoint lists.
+    """Fail closed when 9router-only mode is enabled with invalid endpoint lists.
 
     Requires exactly one URL for TTS and one for STT. Rejects empty lists,
     comma-separated failover chains, and any endpoint whose hostname is
     ``api.openai.com``. Does not rewrite configuration.
     """
     if enabled is None:
-        enabled = OMNIROUTE_ONLY
+        enabled = NINE_ROUTER_ONLY
     if not enabled:
         return
 
@@ -655,33 +655,33 @@ def validate_omniroute_only_urls(
     )
     for name, urls in checks:
         if not urls:
-            raise OmniRouteConfigError(
-                f"VOICEMODE_OMNIROUTE_ONLY=true requires {name} with exactly one "
-                f"OpenAI-compatible endpoint (e.g. https://YOUR-OMNIROUTE-HOST/v1). "
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true requires {name} with exactly one "
+                f"OpenAI-compatible endpoint (e.g. https://YOUR-9ROUTER-HOST/v1). "
                 f"Set it in the environment or ~/.voicemode/voicemode.env."
             )
         if len(urls) != 1:
-            raise OmniRouteConfigError(
-                f"VOICEMODE_OMNIROUTE_ONLY=true rejects failover chains: {name} must "
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true rejects failover chains: {name} must "
                 f"contain exactly one URL, got {len(urls)}. Remove comma-separated extras."
             )
         host = _endpoint_hostname(urls[0])
         if not host:
-            raise OmniRouteConfigError(
-                f"VOICEMODE_OMNIROUTE_ONLY=true: {name} value is not a valid URL with a hostname."
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true: {name} value is not a valid URL with a hostname."
             )
         if host == "api.openai.com":
-            raise OmniRouteConfigError(
-                f"VOICEMODE_OMNIROUTE_ONLY=true forbids api.openai.com in {name}. "
-                f"Point {name} at your OmniRoute host only."
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true forbids api.openai.com in {name}. "
+                f"Point {name} at your 9router host only."
             )
 
 
-def apply_omniroute_only_runtime_flags() -> None:
-    """Force local/cloud fallback knobs off when OmniRoute-only mode is active."""
+def apply_nine_router_only_runtime_flags() -> None:
+    """Force local/cloud fallback knobs off when 9router-only mode is active."""
     global PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO, AUTO_START_SERVICES
     global SERVICE_AUTO_ENABLE
-    if not OMNIROUTE_ONLY:
+    if not NINE_ROUTER_ONLY:
         return
     PREFER_LOCAL = False
     ALWAYS_TRY_LOCAL = False
@@ -825,8 +825,8 @@ except ValueError:
 
 # ==================== SERVICE CONFIGURATION ====================
 
-# OpenAI-compatible API key (OpenAI cloud, OmniRoute, or any Bearer-token backend).
-# In OmniRoute-only mode this holds the OmniRoute credential; the variable name is
+# OpenAI-compatible API key (OpenAI cloud, 9router, or any Bearer-token backend).
+# In 9router-only mode this holds the 9router credential; the variable name is
 # kept for AsyncOpenAI client compatibility. Never log or raise this value.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -870,19 +870,19 @@ def parse_provider_models(prefix: str) -> dict:
     return result
 
 # New provider endpoint lists configuration.
-# OmniRoute-only mode must not inherit the default local+OpenAI failover chain.
+# 9router-only mode must not inherit the default local+OpenAI failover chain.
 _DEFAULT_TTS_BASE_URLS = "http://127.0.0.1:8880/v1,https://api.openai.com/v1"
 _DEFAULT_STT_BASE_URLS = "http://127.0.0.1:2022/v1,https://api.openai.com/v1"
 TTS_BASE_URLS = parse_comma_list(
     "VOICEMODE_TTS_BASE_URLS",
-    "" if OMNIROUTE_ONLY else _DEFAULT_TTS_BASE_URLS,
+    "" if NINE_ROUTER_ONLY else _DEFAULT_TTS_BASE_URLS,
 )
 STT_BASE_URLS = parse_comma_list(
     "VOICEMODE_STT_BASE_URLS",
-    "" if OMNIROUTE_ONLY else _DEFAULT_STT_BASE_URLS,
+    "" if NINE_ROUTER_ONLY else _DEFAULT_STT_BASE_URLS,
 )
-validate_omniroute_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
-apply_omniroute_only_runtime_flags()
+validate_nine_router_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
+apply_nine_router_only_runtime_flags()
 TTS_VOICES = parse_comma_list("VOICEMODE_VOICES", "af_sky,alloy")
 TTS_MODELS = parse_comma_list("VOICEMODE_TTS_MODELS", "tts-1,tts-1-hd,gpt-4o-mini-tts")
 STT_MODEL = os.getenv("VOICEMODE_STT_MODEL", "whisper-1")
@@ -967,19 +967,19 @@ def reload_configuration():
     global TTS_VOICES, TTS_MODELS, TTS_BASE_URLS, STT_BASE_URLS, STT_MODEL, STT_MODELS
     global TTS_MODELS_BY_PROVIDER
     global STT_RETRY_ATTEMPTS, STT_RETRY_BACKOFF, STT_RETRY_BACKOFF_MAX
-    global OMNIROUTE_ONLY, PREFER_LOCAL, ALWAYS_TRY_LOCAL
+    global NINE_ROUTER_ONLY, PREFER_LOCAL, ALWAYS_TRY_LOCAL
     global AUTO_START_KOKORO, AUTO_START_SERVICES, SERVICE_AUTO_ENABLE
-    OMNIROUTE_ONLY = os.getenv("VOICEMODE_OMNIROUTE_ONLY", "").lower() in ("true", "1", "yes", "on")
+    NINE_ROUTER_ONLY = os.getenv("VOICEMODE_9ROUTER_ONLY", "").lower() in ("true", "1", "yes", "on")
     TTS_BASE_URLS = parse_comma_list(
         "VOICEMODE_TTS_BASE_URLS",
-        "" if OMNIROUTE_ONLY else _DEFAULT_TTS_BASE_URLS,
+        "" if NINE_ROUTER_ONLY else _DEFAULT_TTS_BASE_URLS,
     )
     STT_BASE_URLS = parse_comma_list(
         "VOICEMODE_STT_BASE_URLS",
-        "" if OMNIROUTE_ONLY else _DEFAULT_STT_BASE_URLS,
+        "" if NINE_ROUTER_ONLY else _DEFAULT_STT_BASE_URLS,
     )
-    validate_omniroute_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
-    # Re-read local/auto-start knobs, then force them off under OmniRoute-only.
+    validate_nine_router_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
+    # Re-read local/auto-start knobs, then force them off under 9router-only.
     PREFER_LOCAL = os.getenv("VOICEMODE_PREFER_LOCAL", "true").lower() in ("true", "1", "yes", "on")
     ALWAYS_TRY_LOCAL = os.getenv("VOICEMODE_ALWAYS_TRY_LOCAL", "true").lower() in ("true", "1", "yes", "on")
     AUTO_START_SERVICES = os.getenv("VOICEMODE_AUTO_START_SERVICES", "").lower() in ("true", "1", "yes", "on")
@@ -988,7 +988,7 @@ def reload_configuration():
         or AUTO_START_SERVICES
     )
     SERVICE_AUTO_ENABLE = env_bool("VOICEMODE_SERVICE_AUTO_ENABLE", True)
-    apply_omniroute_only_runtime_flags()
+    apply_nine_router_only_runtime_flags()
     TTS_VOICES = parse_comma_list("VOICEMODE_VOICES", "af_sky,alloy")
     TTS_MODELS = parse_comma_list("VOICEMODE_TTS_MODELS", "tts-1,tts-1-hd,gpt-4o-mini-tts")
     TTS_MODELS_BY_PROVIDER = parse_provider_models("VOICEMODE_TTS_MODELS")
@@ -1052,7 +1052,7 @@ CLONE_MODEL = os.environ.get(
 
 # Auto-enable services after installation
 SERVICE_AUTO_ENABLE = env_bool("VOICEMODE_SERVICE_AUTO_ENABLE", True)
-if OMNIROUTE_ONLY:
+if NINE_ROUTER_ONLY:
     SERVICE_AUTO_ENABLE = False
 
 # ==================== SOUND FONTS CONFIGURATION ====================

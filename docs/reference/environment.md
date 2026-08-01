@@ -18,7 +18,7 @@ Environment variables are processed in this order (highest to lowest priority):
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
-| `OPENAI_API_KEY` | OpenAI-compatible Bearer token (OpenAI cloud or OmniRoute/proxy credential; variable name kept for client compatibility) | None | `YOUR_OMNIROUTE_API_KEY` |
+| `OPENAI_API_KEY` | OpenAI-compatible Bearer token (OpenAI cloud or 9router/proxy credential; variable name kept for client compatibility) | None | `YOUR_9ROUTER_API_KEY` |
 
 ## Voice Services
 
@@ -183,7 +183,7 @@ Log levels: `debug`, `info`, `warning`, `error`, `critical`
 |----------|-------------|---------|---------|
 | `VOICEMODE_PREFER_LOCAL` | Prefer local services | `true` | `false` |
 | `VOICEMODE_AUTO_START_SERVICES` | Auto-start local services | `false` | `true` |
-| `VOICEMODE_OMNIROUTE_ONLY` | Strict single OpenAI-compatible backend (no OpenAI cloud, no local failover/auto-start). Requires exactly one non-`api.openai.com` URL in each of `VOICEMODE_TTS_BASE_URLS` and `VOICEMODE_STT_BASE_URLS`. `OPENAI_API_KEY` holds the OmniRoute Bearer credential. | `false` | `true` |
+| `VOICEMODE_9ROUTER_ONLY` | Strict single OpenAI-compatible backend (no OpenAI cloud, no local failover/auto-start). Requires exactly one non-`api.openai.com` URL in each of `VOICEMODE_TTS_BASE_URLS` and `VOICEMODE_STT_BASE_URLS`. `OPENAI_API_KEY` holds the 9router Bearer credential. | `false` | `true` |
 
 ### Control Channel
 
