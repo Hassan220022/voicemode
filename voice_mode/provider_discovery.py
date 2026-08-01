@@ -20,7 +20,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from . import config
-from .config import TTS_BASE_URLS, STT_BASE_URLS, OPENAI_API_KEY
+from .config import TTS_BASE_URLS, STT_BASE_URLS
 
 logger = logging.getLogger("voicemode")
 
@@ -195,7 +195,7 @@ class ProviderRegistry:
         try:
             # Create OpenAI client for the endpoint
             client = AsyncOpenAI(
-                api_key=OPENAI_API_KEY or "dummy-key-for-local",
+                api_key=config.OPENAI_API_KEY or "dummy-key-for-local",
                 base_url=base_url,
                 timeout=10.0
             )

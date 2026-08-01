@@ -189,6 +189,16 @@ VOICEMODE_VOICES=af_sky
 # Auto-start Kokoro service (true/false)
 # VOICEMODE_AUTO_START_KOKORO=false
 
+# Auto-start local services alias (docs name; same effect as AUTO_START_KOKORO today)
+# VOICEMODE_AUTO_START_SERVICES=false
+
+# 9router-only mode (opt-in): pin TTS+STT to exactly one non-OpenAI OpenAI-compatible
+# endpoint each. No api.openai.com, no comma-separated failover, no local auto-start.
+# OPENAI_API_KEY is still the Bearer credential (9router key or other compatible key).
+# VOICEMODE_9ROUTER_ONLY=false
+# VOICEMODE_TTS_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
+# VOICEMODE_STT_BASE_URLS=https://YOUR-9ROUTER-HOST/v1
+
 #############
 # Whisper Configuration
 #############
@@ -594,8 +604,100 @@ ALWAYS_TRY_LOCAL = os.getenv("VOICEMODE_ALWAYS_TRY_LOCAL", "true").lower() in ("
 # Use simple failover without health checks
 # Simple failover is now the only mode - configuration removed
 
-# Auto-start configuration
-AUTO_START_KOKORO = os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+# Auto-start configuration (AUTO_START_SERVICES is the documented alias)
+AUTO_START_SERVICES = os.getenv("VOICEMODE_AUTO_START_SERVICES", "").lower() in ("true", "1", "yes", "on")
+AUTO_START_KOKORO = (
+    os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+    or AUTO_START_SERVICES
+)
+
+# 9router-only: fail closed to a single OpenAI-compatible non-OpenAI backend.
+# Must be defined before TTS/STT URL parsing so defaults that include api.openai.com
+# are not injected while this mode is on.
+NINE_ROUTER_ONLY = os.getenv("VOICEMODE_9ROUTER_ONLY", "").lower() in ("true", "1", "yes", "on")
+
+
+class NineRouterConfigError(ValueError):
+    """Invalid VOICEMODE_9ROUTER_ONLY configuration (fail closed, never rewrite)."""
+
+
+def _endpoint_hostname(url: str) -> str:
+    """Return lowercase hostname for a base URL, or empty string if unparsable."""
+    from urllib.parse import urlparse
+
+    try:
+        host = (urlparse(url.strip()).hostname or "").lower()
+        return host.rstrip(".")
+    except Exception:
+        return ""
+
+
+def validate_nine_router_only_urls(
+    tts_urls: list,
+    stt_urls: list,
+    *,
+    enabled: bool | None = None,
+) -> None:
+    """Fail closed when 9router-only mode is enabled with invalid endpoint lists.
+
+    Requires exactly one URL for TTS and one for STT. Rejects empty lists,
+    comma-separated failover chains, and any endpoint whose hostname is
+    ``api.openai.com``. Does not rewrite configuration.
+    """
+    if enabled is None:
+        enabled = NINE_ROUTER_ONLY
+    if not enabled:
+        return
+
+    checks = (
+        ("VOICEMODE_TTS_BASE_URLS", tts_urls),
+        ("VOICEMODE_STT_BASE_URLS", stt_urls),
+    )
+    for name, urls in checks:
+        if not urls:
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true requires {name} with exactly one "
+                f"OpenAI-compatible endpoint (e.g. https://YOUR-9ROUTER-HOST/v1). "
+                f"Set it in the environment or ~/.voicemode/voicemode.env."
+            )
+        if len(urls) != 1:
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true rejects failover chains: {name} must "
+                f"contain exactly one URL, got {len(urls)}. Remove comma-separated extras."
+            )
+        from urllib.parse import urlparse
+
+        parsed = urlparse(urls[0].strip())
+        host = _endpoint_hostname(urls[0])
+        if not host:
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true: {name} value is not a valid URL with a hostname."
+            )
+        if parsed.username or parsed.password:
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true forbids credentials in {name}. "
+                "Use OPENAI_API_KEY for the Bearer credential."
+            )
+        if host == "api.openai.com" or host in {"localhost", "127.0.0.1", "::1"}:
+            raise NineRouterConfigError(
+                f"VOICEMODE_9ROUTER_ONLY=true forbids OpenAI and local endpoints in {name}. "
+                f"Point {name} at the remote 9router host only."
+            )
+
+
+def apply_nine_router_only_runtime_flags() -> None:
+    """Force local/cloud fallback knobs off when 9router-only mode is active."""
+    global PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO, AUTO_START_SERVICES
+    global SERVICE_AUTO_ENABLE
+    if not NINE_ROUTER_ONLY:
+        return
+    PREFER_LOCAL = False
+    ALWAYS_TRY_LOCAL = False
+    AUTO_START_KOKORO = False
+    AUTO_START_SERVICES = False
+    # SERVICE_AUTO_ENABLE is defined later at import time; guard AttributeError on first pass
+    if "SERVICE_AUTO_ENABLE" in globals():
+        SERVICE_AUTO_ENABLE = False
 
 # ==================== CONCH CONFIGURATION ====================
 # The conch is a coordination mechanism for multi-agent voice conversations
@@ -731,7 +833,9 @@ except ValueError:
 
 # ==================== SERVICE CONFIGURATION ====================
 
-# OpenAI configuration
+# OpenAI-compatible API key (OpenAI cloud, 9router, or any Bearer-token backend).
+# In 9router-only mode this holds the 9router credential; the variable name is
+# kept for AsyncOpenAI client compatibility. Never log or raise this value.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Cartesia configuration (https://cartesia.ai)
@@ -773,9 +877,20 @@ def parse_provider_models(prefix: str) -> dict:
             result[provider_type] = models
     return result
 
-# New provider endpoint lists configuration
-TTS_BASE_URLS = parse_comma_list("VOICEMODE_TTS_BASE_URLS", "http://127.0.0.1:8880/v1,https://api.openai.com/v1")
-STT_BASE_URLS = parse_comma_list("VOICEMODE_STT_BASE_URLS", "http://127.0.0.1:2022/v1,https://api.openai.com/v1")
+# New provider endpoint lists configuration.
+# 9router-only mode must not inherit the default local+OpenAI failover chain.
+_DEFAULT_TTS_BASE_URLS = "http://127.0.0.1:8880/v1,https://api.openai.com/v1"
+_DEFAULT_STT_BASE_URLS = "http://127.0.0.1:2022/v1,https://api.openai.com/v1"
+TTS_BASE_URLS = parse_comma_list(
+    "VOICEMODE_TTS_BASE_URLS",
+    "" if NINE_ROUTER_ONLY else _DEFAULT_TTS_BASE_URLS,
+)
+STT_BASE_URLS = parse_comma_list(
+    "VOICEMODE_STT_BASE_URLS",
+    "" if NINE_ROUTER_ONLY else _DEFAULT_STT_BASE_URLS,
+)
+validate_nine_router_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
+apply_nine_router_only_runtime_flags()
 TTS_VOICES = parse_comma_list("VOICEMODE_VOICES", "af_sky,alloy")
 TTS_MODELS = parse_comma_list("VOICEMODE_TTS_MODELS", "tts-1,tts-1-hd,gpt-4o-mini-tts")
 STT_MODEL = os.getenv("VOICEMODE_STT_MODEL", "whisper-1")
@@ -852,24 +967,51 @@ def reload_configuration():
     """Reload configuration from files and clear all caches."""
     # Clear voice preferences cache
     clear_voice_preferences_cache()
-    
+
     # Reload environment configuration
     load_voicemode_env()
-    
+
     # Update global configuration variables
-    global TTS_VOICES, TTS_MODELS, TTS_BASE_URLS, STT_BASE_URLS, STT_MODEL, STT_MODELS
-    global TTS_MODELS_BY_PROVIDER
+    global STT_MODEL, OPENAI_API_KEY
     global STT_RETRY_ATTEMPTS, STT_RETRY_BACKOFF, STT_RETRY_BACKOFF_MAX
-    TTS_BASE_URLS = parse_comma_list("VOICEMODE_TTS_BASE_URLS", "http://127.0.0.1:8880/v1,https://api.openai.com/v1")
-    STT_BASE_URLS = parse_comma_list("VOICEMODE_STT_BASE_URLS", "http://127.0.0.1:2022/v1,https://api.openai.com/v1")
-    TTS_VOICES = parse_comma_list("VOICEMODE_VOICES", "af_sky,alloy")
-    TTS_MODELS = parse_comma_list("VOICEMODE_TTS_MODELS", "tts-1,tts-1-hd,gpt-4o-mini-tts")
-    TTS_MODELS_BY_PROVIDER = parse_provider_models("VOICEMODE_TTS_MODELS")
+    global NINE_ROUTER_ONLY, PREFER_LOCAL, ALWAYS_TRY_LOCAL
+    global AUTO_START_KOKORO, AUTO_START_SERVICES, SERVICE_AUTO_ENABLE
+    NINE_ROUTER_ONLY = os.getenv("VOICEMODE_9ROUTER_ONLY", "").lower() in ("true", "1", "yes", "on")
+    # Mutate lists so modules that imported them continue using live endpoints.
+    TTS_BASE_URLS[:] = parse_comma_list(
+        "VOICEMODE_TTS_BASE_URLS",
+        "" if NINE_ROUTER_ONLY else _DEFAULT_TTS_BASE_URLS,
+    )
+    STT_BASE_URLS[:] = parse_comma_list(
+        "VOICEMODE_STT_BASE_URLS",
+        "" if NINE_ROUTER_ONLY else _DEFAULT_STT_BASE_URLS,
+    )
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    validate_nine_router_only_urls(TTS_BASE_URLS, STT_BASE_URLS)
+    # Re-read local/auto-start knobs, then force them off under 9router-only.
+    PREFER_LOCAL = os.getenv("VOICEMODE_PREFER_LOCAL", "true").lower() in ("true", "1", "yes", "on")
+    ALWAYS_TRY_LOCAL = os.getenv("VOICEMODE_ALWAYS_TRY_LOCAL", "true").lower() in ("true", "1", "yes", "on")
+    AUTO_START_SERVICES = os.getenv("VOICEMODE_AUTO_START_SERVICES", "").lower() in ("true", "1", "yes", "on")
+    AUTO_START_KOKORO = (
+        os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+        or AUTO_START_SERVICES
+    )
+    SERVICE_AUTO_ENABLE = env_bool("VOICEMODE_SERVICE_AUTO_ENABLE", True)
+    apply_nine_router_only_runtime_flags()
+    TTS_VOICES[:] = parse_comma_list("VOICEMODE_VOICES", "af_sky,alloy")
+    TTS_MODELS[:] = parse_comma_list("VOICEMODE_TTS_MODELS", "tts-1,tts-1-hd,gpt-4o-mini-tts")
+    TTS_MODELS_BY_PROVIDER.clear()
+    TTS_MODELS_BY_PROVIDER.update(parse_provider_models("VOICEMODE_TTS_MODELS"))
     STT_MODEL = os.getenv("VOICEMODE_STT_MODEL", "whisper-1")
-    STT_MODELS = parse_comma_list("VOICEMODE_STT_MODELS", "")
+    STT_MODELS[:] = parse_comma_list("VOICEMODE_STT_MODELS", "")
     STT_RETRY_ATTEMPTS = int(os.getenv("VOICEMODE_STT_RETRY_ATTEMPTS", "2"))
     STT_RETRY_BACKOFF = float(os.getenv("VOICEMODE_STT_RETRY_BACKOFF", "0.5"))
     STT_RETRY_BACKOFF_MAX = float(os.getenv("VOICEMODE_STT_RETRY_BACKOFF_MAX", "4.0"))
+
+    # Provider discovery caches endpoint metadata; force it to rebuild on demand.
+    from .provider_discovery import provider_registry
+    provider_registry.registry = {"tts": {}, "stt": {}}
+    provider_registry._initialized = False
 
     logger.info("Configuration reloaded successfully")
 
@@ -925,6 +1067,8 @@ CLONE_MODEL = os.environ.get(
 
 # Auto-enable services after installation
 SERVICE_AUTO_ENABLE = env_bool("VOICEMODE_SERVICE_AUTO_ENABLE", True)
+if NINE_ROUTER_ONLY:
+    SERVICE_AUTO_ENABLE = False
 
 # ==================== SOUND FONTS CONFIGURATION ====================
 

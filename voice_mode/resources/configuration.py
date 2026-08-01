@@ -5,13 +5,14 @@ from typing import Dict, Any
 from pathlib import Path
 
 from ..server import mcp
+from .. import config as vm_config
 from ..config import (
     logger,
     # Core settings
     BASE_DIR, DEBUG, SAVE_ALL, SAVE_AUDIO, SAVE_TRANSCRIPTIONS,
     AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO,
     # Service settings
-    OPENAI_API_KEY, TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
+    TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
     STT_MODEL, STT_MODELS,
     # Whisper settings
     WHISPER_MODEL, WHISPER_PORT, WHISPER_LANGUAGE, WHISPER_MODEL_PATH,
@@ -76,15 +77,20 @@ async def all_configuration() -> str:
     
     # Provider Settings
     lines.append("Provider Settings:")
-    lines.append(f"  Prefer Local: {PREFER_LOCAL}")
-    lines.append(f"  Always Try Local: {ALWAYS_TRY_LOCAL}")
-    lines.append(f"  Auto-start Kokoro: {AUTO_START_KOKORO}")
+    lines.append(f"  9router Only: {vm_config.NINE_ROUTER_ONLY}")
+    lines.append(f"  Prefer Local: {vm_config.PREFER_LOCAL}")
+    lines.append(f"  Always Try Local: {vm_config.ALWAYS_TRY_LOCAL}")
+    lines.append(f"  Auto-start Kokoro: {vm_config.AUTO_START_KOKORO}")
+    lines.append(f"  Auto-start Services: {vm_config.AUTO_START_SERVICES}")
     lines.append(f"  TTS Endpoints: {', '.join(TTS_BASE_URLS)}")
     lines.append(f"  STT Endpoints: {', '.join(STT_BASE_URLS)}")
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")
     lines.append(f"  TTS Models: {', '.join(TTS_MODELS)}")
-    if OPENAI_API_KEY:
-        lines.append(f"  OpenAI API Key: {mask_sensitive(OPENAI_API_KEY, 'openai_api_key')}")
+    if vm_config.OPENAI_API_KEY:
+        # OPENAI_API_KEY may hold an 9router (or other OpenAI-compatible) credential.
+        lines.append(
+            f"  OpenAI-compatible API Key: {mask_sensitive(vm_config.OPENAI_API_KEY, 'openai_api_key')}"
+        )
     lines.append("")
     
     # Audio Settings

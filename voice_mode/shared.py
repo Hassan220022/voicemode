@@ -12,11 +12,12 @@ import httpx
 import sounddevice as sd
 
 # Import all configuration from config.py
+from . import config as vm_config
 from .config import (
     DEBUG, DEBUG_DIR, SAVE_AUDIO, AUDIO_DIR,
     AUDIO_FEEDBACK_ENABLED,
     OPENAI_API_KEY,
-    AUTO_START_KOKORO, PREFER_LOCAL,
+    PREFER_LOCAL,
     SAMPLE_RATE, CHANNELS,
     audio_operation_lock, service_processes,
     logger, disable_sounddevice_stderr_redirect
@@ -40,8 +41,8 @@ async def startup_initialization():
     _startup_initialized = True
     logger.info("Running startup initialization...")
     
-    # Check if we should auto-start Kokoro
-    if AUTO_START_KOKORO:
+    # 9router-only never auto-starts local Kokoro/Whisper.
+    if vm_config.AUTO_START_KOKORO and not vm_config.NINE_ROUTER_ONLY:
         try:
             # Check if Kokoro is already running
             async with httpx.AsyncClient(timeout=3.0) as client:

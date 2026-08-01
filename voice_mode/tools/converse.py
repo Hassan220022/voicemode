@@ -438,8 +438,18 @@ async def startup_initialization():
     logger.info("Initializing provider registry...")
     await provider_registry.initialize()
     
-    # Check if we should auto-start Kokoro
-    auto_start_kokoro = os.getenv("VOICE_MODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+    # Check if we should auto-start Kokoro (never under 9router-only).
+    # Read live config module attrs so reload_configuration() is observed.
+    import voice_mode.config as _vm_config
+    auto_start_kokoro = (
+        not _vm_config.NINE_ROUTER_ONLY
+        and (
+            _vm_config.AUTO_START_KOKORO
+            or os.getenv("VOICEMODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+            # legacy misspelling kept for compatibility
+            or os.getenv("VOICE_MODE_AUTO_START_KOKORO", "").lower() in ("true", "1", "yes", "on")
+        )
+    )
     if auto_start_kokoro:
         try:
             # Check if Kokoro is already running
@@ -484,33 +494,27 @@ async def startup_initialization():
 
 
 async def get_stt_config(provider: Optional[str] = None):
-    """Get STT configuration - simplified to use direct config"""
-    from voice_mode.provider_discovery import detect_provider_type
-    from voice_mode.config import STT_BASE_URLS
+    """Return the configured STT endpoint metadata."""
+    from voice_mode import config as vm_config
+    from voice_mode.provider_discovery import EndpointInfo, detect_provider_type
+    from voice_mode.providers import _select_stt_model_for_endpoint
 
-    # Map provider names to base URLs
-    provider_urls = {
-        'whisper-local': 'http://127.0.0.1:2022/v1',
-        'openai-whisper': 'https://api.openai.com/v1'
-    }
-
-    # Convert provider name to URL if it's a known provider
-    base_url = None
-    if provider:
-        base_url = provider_urls.get(provider, provider)
-
-    # Use first available endpoint from config
+    provider_urls = {'whisper-local': 'http://127.0.0.1:2022/v1'}
+    base_url = provider_urls.get(provider, provider) if provider else None
     if not base_url:
-        base_url = STT_BASE_URLS[0] if STT_BASE_URLS else 'https://api.openai.com/v1'
+        if not vm_config.STT_BASE_URLS:
+            raise ValueError("No STT endpoint configured")
+        base_url = vm_config.STT_BASE_URLS[0]
 
     provider_type = detect_provider_type(base_url)
-
-    # Return simplified configuration
+    model = _select_stt_model_for_endpoint(
+        EndpointInfo(base_url=base_url, models=[], voices=[], provider_type=provider_type)
+    )
     return {
         'base_url': base_url,
-        'model': 'whisper-1',
-        'provider': 'whisper-local' if '127.0.0.1' in base_url or 'localhost' in base_url else 'openai-whisper',
-        'provider_type': provider_type
+        'model': model,
+        'provider': 'whisper-local' if provider_type == 'whisper' else provider_type,
+        'provider_type': provider_type,
     }
 
 
