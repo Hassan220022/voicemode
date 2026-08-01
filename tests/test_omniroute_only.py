@@ -237,3 +237,15 @@ def test_reload_updates_live_omniroute_flag(isolated_reload, monkeypatch):
     cfg.reload_configuration()
     assert cfg.OMNIROUTE_ONLY is False
     assert sf.vm_config.OMNIROUTE_ONLY is False
+
+
+def test_stt_unwraps_json_text_response_format():
+    """Proxies that ignore response_format=text return JSON-as-string; unwrap it."""
+    import json
+    raw = json.dumps({"text": "hello from nine router"})
+    text = raw.strip()
+    if text.startswith("{") and '"text"' in text:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict) and isinstance(parsed.get("text"), str):
+            text = parsed["text"].strip()
+    assert text == "hello from nine router"

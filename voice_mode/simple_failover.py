@@ -502,6 +502,16 @@ async def simple_stt_failover(
             request_time_ms = (time.perf_counter() - request_start) * 1000
 
             text = transcription.strip() if isinstance(transcription, str) else transcription.text.strip()
+            # 9router (and some OpenAI-compatible proxies) ignore response_format=text
+            # and return a JSON object body; the SDK then surfaces that JSON as a str.
+            if text.startswith("{") and '"text"' in text:
+                try:
+                    import json as _json
+                    parsed = _json.loads(text)
+                    if isinstance(parsed, dict) and isinstance(parsed.get("text"), str):
+                        text = parsed["text"].strip()
+                except Exception:
+                    pass
 
             # Build metrics dict
             is_local = is_local_provider(base_url)
