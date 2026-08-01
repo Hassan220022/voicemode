@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **9router-only backend** (`VOICEMODE_9ROUTER_ONLY=true`) — pin TTS and STT to exactly one OpenAI-compatible non-`api.openai.com` endpoint each. Fail closed on missing URLs, multi-URL failover chains, or OpenAI hostnames. Forces `PREFER_LOCAL` / auto-start off; no OpenAI or local fallback on request failure. Template: `.voicemode.env.example`. Docs: configuration guide + environment reference.
+
 ## [8.12.0] - 2026-07-21
 
 ### Fixed
