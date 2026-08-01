@@ -77,7 +77,10 @@ class TestProviderDetection:
     async def test_endpoint_info_attribute_usage(self):
         """Test that get_stt_config returns proper configuration."""
         # Mock STT_BASE_URLS to control the endpoint
-        with patch('voice_mode.config.STT_BASE_URLS', ["http://127.0.0.1:2022/v1"]):
+        with (
+            patch('voice_mode.config.STT_BASE_URLS', ["http://127.0.0.1:2022/v1"]),
+            patch('voice_mode.config.STT_MODEL', "whisper-1"),
+        ):
             # Call get_stt_config
             config = await get_stt_config()
 

@@ -12,7 +12,7 @@ from ..config import (
     BASE_DIR, DEBUG, SAVE_ALL, SAVE_AUDIO, SAVE_TRANSCRIPTIONS,
     AUDIO_FEEDBACK_ENABLED, PREFER_LOCAL, ALWAYS_TRY_LOCAL, AUTO_START_KOKORO,
     # Service settings
-    OPENAI_API_KEY, TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
+    TTS_BASE_URLS, STT_BASE_URLS, TTS_VOICES, TTS_MODELS,
     STT_MODEL, STT_MODELS,
     # Whisper settings
     WHISPER_MODEL, WHISPER_PORT, WHISPER_LANGUAGE, WHISPER_MODEL_PATH,
@@ -86,10 +86,10 @@ async def all_configuration() -> str:
     lines.append(f"  STT Endpoints: {', '.join(STT_BASE_URLS)}")
     lines.append(f"  TTS Voices: {', '.join(TTS_VOICES)}")
     lines.append(f"  TTS Models: {', '.join(TTS_MODELS)}")
-    if OPENAI_API_KEY:
+    if vm_config.OPENAI_API_KEY:
         # OPENAI_API_KEY may hold an 9router (or other OpenAI-compatible) credential.
         lines.append(
-            f"  OpenAI-compatible API Key: {mask_sensitive(OPENAI_API_KEY, 'openai_api_key')}"
+            f"  OpenAI-compatible API Key: {mask_sensitive(vm_config.OPENAI_API_KEY, 'openai_api_key')}"
         )
     lines.append("")
     

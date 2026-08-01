@@ -14,8 +14,7 @@ from .provider_discovery import is_local_provider
 
 from . import config as vm_config
 from .config import (
-    TTS_BASE_URLS, STT_BASE_URLS, OPENAI_API_KEY, STT_PROMPT, WHISPER_LANGUAGE,
-    STT_RETRY_ATTEMPTS, STT_RETRY_BACKOFF, STT_RETRY_BACKOFF_MAX,
+    TTS_BASE_URLS, STT_BASE_URLS,
 )
 from .provider_discovery import detect_provider_type, EndpointInfo
 from .providers import _select_stt_model_for_endpoint, _select_tts_model_for_endpoint
@@ -72,7 +71,7 @@ def _prepare_tts_endpoint(base_url, voice, model, clone_profile):
         tuple: (client, selected_voice, selected_model, provider_type)
     """
     provider_type = detect_provider_type(base_url)
-    api_key = OPENAI_API_KEY if provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
+    api_key = vm_config.OPENAI_API_KEY if provider_type == "openai" else (vm_config.OPENAI_API_KEY or "dummy-key-for-local")
 
     if clone_profile:
         # Clone voice: use profile's model and pass voice name through
@@ -421,7 +420,7 @@ async def simple_stt_failover(
                 logger.warning(f"STT: Primary failed, attempting fallback #{i}: {base_url} ({provider_type})")
 
             # Create client for this endpoint
-            api_key = OPENAI_API_KEY if provider_type == "openai" else (OPENAI_API_KEY or "dummy-key-for-local")
+            api_key = vm_config.OPENAI_API_KEY if provider_type == "openai" else (vm_config.OPENAI_API_KEY or "dummy-key-for-local")
 
             # Local endpoints keep the SDK client's own retries at 0; transient
             # retries for local STT are handled by the explicit backoff loop
@@ -454,15 +453,15 @@ async def simple_stt_failover(
                 "file": audio_file,
                 "response_format": "text"
             }
-            if STT_PROMPT:
-                transcription_kwargs["prompt"] = STT_PROMPT
+            if vm_config.STT_PROMPT:
+                transcription_kwargs["prompt"] = vm_config.STT_PROMPT
 
             # Handle language parameter based on provider
             # - whisper.cpp: needs "auto" explicitly (default is "en")
             # - OpenAI API: omit for auto-detect (doesn't accept "auto")
-            if WHISPER_LANGUAGE and WHISPER_LANGUAGE != "auto":
+            if vm_config.WHISPER_LANGUAGE and vm_config.WHISPER_LANGUAGE != "auto":
                 # Explicit language set - pass to all providers
-                transcription_kwargs["language"] = WHISPER_LANGUAGE
+                transcription_kwargs["language"] = vm_config.WHISPER_LANGUAGE
             elif is_local_provider(base_url):
                 # Local whisper.cpp with auto mode - must pass "auto" explicitly
                 transcription_kwargs["language"] = "auto"
@@ -478,7 +477,7 @@ async def simple_stt_failover(
             # so remote behaviour is unchanged.
             retries = (
                 0 if vm_config.NINE_ROUTER_ONLY
-                else (STT_RETRY_ATTEMPTS if is_local_provider(base_url) else 0)
+                else (vm_config.STT_RETRY_ATTEMPTS if is_local_provider(base_url) else 0)
             )
             attempt = 0
             while True:
@@ -487,7 +486,7 @@ async def simple_stt_failover(
                     break
                 except Exception as e:
                     if attempt < retries and _is_transient_stt_error(e):
-                        delay = min(STT_RETRY_BACKOFF * (2 ** attempt), STT_RETRY_BACKOFF_MAX)
+                        delay = min(vm_config.STT_RETRY_BACKOFF * (2 ** attempt), vm_config.STT_RETRY_BACKOFF_MAX)
                         logger.warning(
                             f"STT transient failure on {base_url} "
                             f"(try {attempt + 1}/{retries + 1}): {e}; retry in {delay:.1f}s"

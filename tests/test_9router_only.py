@@ -91,9 +91,11 @@ def test_rejects_missing_base_urls(isolated_reload, monkeypatch, tts, stt, missi
         (OPENAI_URL, NINE_ROUTER_URL),
         (NINE_ROUTER_URL, OPENAI_URL),
         (OPENAI_URL, OPENAI_URL),
+        (LOCAL_TTS, NINE_ROUTER_URL),
+        (NINE_ROUTER_URL, LOCAL_STT),
     ],
 )
-def test_rejects_api_openai_com(isolated_reload, monkeypatch, tts, stt):
+def test_rejects_openai_and_local_endpoints(isolated_reload, monkeypatch, tts, stt):
     cfg = isolated_reload
     monkeypatch.setenv("VOICEMODE_9ROUTER_ONLY", "true")
     monkeypatch.setenv("VOICEMODE_TTS_BASE_URLS", tts)
@@ -101,7 +103,7 @@ def test_rejects_api_openai_com(isolated_reload, monkeypatch, tts, stt):
 
     with pytest.raises(cfg.NineRouterConfigError) as exc:
         cfg.reload_configuration()
-    assert "api.openai.com" in str(exc.value)
+    assert "forbids" in str(exc.value)
 
 
 def test_rejects_api_openai_com_trailing_dot(isolated_reload, monkeypatch):
@@ -111,7 +113,7 @@ def test_rejects_api_openai_com_trailing_dot(isolated_reload, monkeypatch):
     monkeypatch.setenv("VOICEMODE_STT_BASE_URLS", NINE_ROUTER_URL)
     with pytest.raises(cfg.NineRouterConfigError) as exc:
         cfg.reload_configuration()
-    assert "api.openai.com" in str(exc.value)
+    assert "forbids" in str(exc.value)
 
 
 @pytest.mark.parametrize(
@@ -219,17 +221,25 @@ def test_clone_voice_does_not_bypass_9router_urls():
     assert profile is fake_profile
 
 
-def test_reload_updates_live_9router_flag(isolated_reload, monkeypatch):
-    """Consumers that read vm_config.NINE_ROUTER_ONLY see reload_configuration()."""
+def test_reload_updates_live_9router_routing_and_credential(isolated_reload, monkeypatch):
+    """Reload mutates imported endpoint lists and refreshes the request credential."""
     import voice_mode.config as cfg
     import voice_mode.simple_failover as sf
 
+    cfg.reload_configuration()
+    tts_urls = sf.TTS_BASE_URLS
+    stt_urls = sf.STT_BASE_URLS
     monkeypatch.setenv("VOICEMODE_9ROUTER_ONLY", "true")
     monkeypatch.setenv("VOICEMODE_TTS_BASE_URLS", NINE_ROUTER_URL)
     monkeypatch.setenv("VOICEMODE_STT_BASE_URLS", NINE_ROUTER_URL)
+    monkeypatch.setenv("OPENAI_API_KEY", "fresh-9router-token")
     cfg.reload_configuration()
+
     assert cfg.NINE_ROUTER_ONLY is True
     assert sf.vm_config.NINE_ROUTER_ONLY is True
+    assert sf.TTS_BASE_URLS is tts_urls == [NINE_ROUTER_URL]
+    assert sf.STT_BASE_URLS is stt_urls == [NINE_ROUTER_URL]
+    assert cfg.OPENAI_API_KEY == "fresh-9router-token"
 
     monkeypatch.setenv("VOICEMODE_9ROUTER_ONLY", "false")
     monkeypatch.delenv("VOICEMODE_TTS_BASE_URLS", raising=False)
